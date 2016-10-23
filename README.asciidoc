@@ -1,0 +1,23 @@
+= COSjisql
+
+Wrapping and packaging for the Xigole JISQL project which provides pure-Java
+SQL clients for JDBC data sources. Native binaries not required. Not anymore.
+Good fit to accompany J2EE application servers that have JDBC libs anyhow.
+
+Currently this repo provides in a convenient location the JDBC JARs for popular
+databases, the JISQL itself, and a shell wrapper script `mysqlj` to probe the
+MySQL or compatible database, as was needed in our deployments. Cloning that
+script for PgSQL etc. is quite possible, maybe someone will do it some day ;)
+
+== Historical note
+
+NOTE: This project's opensourced (Github) life starts without a copy of tracked
+pre-history, as its initial code drop is merged and sanitized from internal and
+end-user projects.
+
+For what it's worth, the initial code drop is based on internal CVS ID
+`$Id: mysqlj,v 1.3 2012/05/11 17:43:24 jim Exp $`
+so code up to this point is
+----
+(C) Nov 2010-Nov 2012 by Jim Klimov, JSC COS&HT
+----

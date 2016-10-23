@@ -1,0 +1,109 @@
+#!/bin/sh
+
+### Wrapper to Xigole JiSQL to call MySQL commands via JDBC,
+### without any need for a binary client in diag scripts, etc.
+### By default requests a list of schemas. The client should 
+### be permitted by server from this host with this login/pass.
+###
+### JiSQL Copyright   (C) 2004-2011 Scott Dunbar (scott@xigole.com)
+###     http://www.xigole.com/software/jisql.jsp
+### Uses JOpt-Simple http://jopt-simple.sourceforge.net/
+###     and Java CSV http://sourceforge.net/projects/javacsv/
+### COSjisql Wrapper/Packaging (C) 2010 by Jim Klimov
+### $Id: mysqlj,v 1.3 2012/05/11 17:43:24 jim Exp $
+
+### TODO: Command-line to pass the query and opther options beside
+### env-vars and/or config-files?
+
+### Source optional config files
+### Variables used (all have defaults and/or auto-values, see below):
+###	JAVA_HOME
+###	LIBDIR with helper JARs (may include JDBC drivers)
+###	MYSQL_DB MYSQL_PORT MYSQL_HOST MYSQL_USER MYSQL_PASS
+###     Resulting MYSQL_URL
+###	MYSQL_QUERY to execute
+###	MYSQLJAR = Connector/J
+COSAS_CFGDIR="`dirname "$0"`/../etc"
+if [ -d "$COSAS_CFGDIR" ]; then
+    [  -f "$COSAS_CFGDIR/COSas.conf" ] && \
+        . "$COSAS_CFGDIR/COSas.conf"
+    [  -f "$COSAS_CFGDIR/`basename "$0"`.conf" ] && \
+        . "$COSAS_CFGDIR/`basename "$0"`.conf"
+fi
+
+# cd "`dirname $0`" || exit 1
+[ x"$LIBDIR" = x ] && LIBDIR="`dirname $0`/../lib"
+
+### Choose a JAVA_HOME if not yet provided
+if [ x"$JAVA_HOME" = x ]; then
+        echo "Choosing JAVA_HOME..."
+        ### Some typical paths for our Solaris and RHEL setups
+        ### Path list order matches our preferences in /etc/profile (COSsysr)
+        for D in \
+                /opt/java \
+                /opt/jdk/default \
+                /opt/jdk/latest \
+                /opt/jdk \
+                /usr/java \
+                /usr/jdk/default \
+                /usr/jdk/latest \
+                /usr/java/latest \
+                /usr/java/default \
+                /usr \
+        ; do
+                [ x"$JAVA_HOME" = x -a -d "$D/bin" -a -x "$D/bin/java" ] && JAVA_HOME="$D"
+        done
+        export JAVA_HOME
+
+        echo "  JAVA_HOME = '$JAVA_HOME'"
+fi
+PATH="$JAVA_HOME/bin:$PATH"
+
+### The user account below should have rights to the log into the
+### database below (typically checking same setup as an appserver
+### deployed on this node) and run the query below.
+#MYSQLJAR=""
+[ x"$MYSQL_DB" = x ] && MYSQL_DB="magnolia_site_author"
+[ x"$MYSQL_PORT" = x ] && MYSQL_PORT="3306"
+[ x"$MYSQL_HOST" = x ] && MYSQL_HOST="mysqlsrv"
+[ x"$MYSQL_USER" = x ] && MYSQL_USER="magnolia"
+[ x"$MYSQL_PASS" = x ] && MYSQL_PASS="Magnolia@123"
+### Primary usage is probing
+[ x"$MYSQL_QUERY" = x ] && MYSQL_QUERY="show databases;"
+
+[ x"$MYSQL_URL" = x ] && MYSQL_URL="jdbc:mysql://$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB"
+
+if [ x"$MYSQLJAR" = x -o ! -s "$MYSQLJAR" ]; then
+    echo "Choosing MySQL-Connector/J library..."
+    for F in \
+        mysql-connector-java-*-bin.jar \
+        lib/mysql-connector-java-*-bin.jar \
+        "$LIBDIR"/mysql-connector-java-*-bin.jar \
+        /opt/*tomcat*/webapps/*/ROOT/WEB-INF/lib/mysql-connector-java-*-bin.jar \
+        /opt/alfresco*/*tomcat*/webapps/*/ROOT/WEB-INF/lib/mysql-connector-java-*-bin.jar \
+        /opt/magnolia*/*tomcat*/webapps/*/ROOT/WEB-INF/lib/mysql-connector-java-*-bin.jar \
+        /opt/*tomcat*/share/lib/mysql-connector-java-*-bin.jar \
+        /opt/alfresco*/*tomcat*/share/lib/mysql-connector-java-*-bin.jar \
+        /opt/magnolia*/*tomcat*/share/lib/mysql-connector-java-*-bin.jar \
+    ; do
+        [ x"$MYSQLJAR" = x -a -s "$F" ] && MYSQLJAR="$F"
+    done
+
+    if [ x"$MYSQLJAR" != x -a -s "$MYSQLJAR" ]; then
+        echo "Found: $MYSQLJAR"
+    else
+        echo "No 'mysql-connector-java-*-bin.jar' located. Aborting!"
+        exit 1
+    fi
+fi
+
+### Actual call
+java -classpath \
+"$MYSQLJAR":\
+"$LIBDIR"/jisql-2.0.11.jar:\
+"$LIBDIR"/jopt-simple-4.3.jar:\
+"$LIBDIR"/javacsv-2.1.jar \
+ com.xigole.util.sql.Jisql \
+ -user "$MYSQL_USER" -password "$MYSQL_PASS" \
+ -driver com.mysql.jdbc.Driver \
+ -cstring "$MYSQL_URL" -c \; -query "$MYSQL_QUERY"
